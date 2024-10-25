@@ -6,7 +6,7 @@ on:
       version:
         description: 'Release version'
         required: true
-        default: '0.1.0'
+        default: '0.13.0'
 
 permissions:
   contents: write
@@ -17,24 +17,15 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y musl-tools
-
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
+    - name: Set up Go
+      uses: actions/setup-go@v2
       with:
-        toolchain: stable
-        target: x86_64-unknown-linux-musl
-        override: true
+        go-version: '1.21'
 
     - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --release --target x86_64-unknown-linux-musl
+      run: |
+        mkdir -p bin/
+        go build -o bin/ ./cmd/...
 
     - name: Create Release
       id: create_release
@@ -47,12 +38,17 @@ jobs:
         draft: false
         prerelease: false
 
+    - name: Compress binaries
+      run: |
+        cd bin/
+        tar czf ../dendrite-${{ github.event.inputs.version }}-linux-amd64.tar.gz *
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/x86_64-unknown-linux-musl/release/cpu_usage
-        asset_name: cpu_usage-${{ github.event.inputs.version }}-linux-x86_64
-        asset_content_type: application/octet-stream
+        asset_path: ./dendrite-${{ github.event.inputs.version }}-linux-amd64.tar.gz
+        asset_name: dendrite-${{ github.event.inputs.version }}-linux-amd64.tar.gz
+        asset_content_type: application/gzip
